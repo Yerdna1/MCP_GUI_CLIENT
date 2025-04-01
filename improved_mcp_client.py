@@ -5,6 +5,10 @@ import json
 import logging
 import traceback
 from typing import Any, Dict, Optional
+from dotenv import load_dotenv # Import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add src directory to Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
