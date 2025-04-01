@@ -7,13 +7,14 @@ try:
     from .conversation_state import conversation_history
 except ImportError:
     # Fallback if run directly or structure changes
+    # Use a local list if import fails, but log error prominently
     conversation_history = []
-    logging.warning("Could not import shared conversation_history from .conversation_state")
+    logging.error("CRITICAL: Could not import shared conversation_history from .conversation_state for Anthropic handler!")
 
 
 def get_anthropic_response(connection_mgr, anthropic_client, anthropic_model, user_input):
     """Handles interaction with Anthropic, including tool calls (synchronous version)."""
-    global conversation_history
+    global conversation_history # Still need global to modify it
 
     # Get available tools from all connected servers
     all_available_tools = connection_mgr.get_all_tools() # Returns {server_name: [tools]}

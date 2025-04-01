@@ -7,6 +7,12 @@ import threading
 import traceback
 from typing import Dict, Any, Optional, List, Tuple
 
+# Import the new async utility
+try:
+    from .client.async_utils import run_async
+except ImportError: # Handle potential relative import issues if structure changes
+     from client.async_utils import run_async
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -60,77 +66,7 @@ class MCPConnectionManager:
         self.connections: Dict[str, Dict[str, Any]] = {}
         self._lock = threading.Lock() # To protect access to self.connections
 
-    def _run_async(self, async_func, timeout=30):
-        """Runs async code in a new thread with a dedicated event loop and timeout."""
-        result = None
-        exception = None
-        thread_done = threading.Event()
-
-        def thread_func():
-            nonlocal result, exception
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                async def run_with_timeout():
-                    return await asyncio.wait_for(async_func(), timeout)
-                result = loop.run_until_complete(run_with_timeout())
-            except asyncio.TimeoutError:
-                exception = TimeoutError(f"Operation timed out after {timeout} seconds")
-                logging.error(f"MCP operation timed out after {timeout} seconds")
-            except Exception as e:
-                exception = e
-                logging.error(f"Error in async operation: {str(e)}")
-                logging.debug(traceback.format_exc())
-            finally:
-                # Refined cleanup: Cancel pending tasks and wait briefly
-                try:
-                    current_task = asyncio.current_task(loop)
-                    tasks = [task for task in asyncio.all_tasks(loop) if task is not current_task]
-                    if tasks:
-                        logging.debug(f"Attempting to cancel {len(tasks)} pending tasks...")
-                        for task in tasks:
-                            task.cancel()
-                        # Wait briefly for cancellations to finish
-                        loop.run_until_complete(asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=5.0))
-                        logging.debug("Finished gathering cancelled tasks.")
-                except asyncio.TimeoutError:
-                     logging.warning("Timed out waiting for cancelled tasks to finish during cleanup.")
-                except Exception as e:
-                    logging.error(f"Error cancelling/gathering pending tasks during cleanup: {str(e)}")
-                finally:
-                    # Proceed with closing the loop
-                    try:
-                        # Ensure loop is stopped before closing
-                        if loop.is_running():
-                            loop.stop()
-                            # Give a moment for stop to register if needed, though close should handle it
-                            # loop.run_until_complete(asyncio.sleep(0.01)) # Usually not needed
-                        if not loop.is_closed():
-                            loop.close()
-                            logging.debug("Event loop closed.")
-                        else:
-                            logging.debug("Event loop already closed.")
-                    except Exception as e:
-                         logging.error(f"Error closing event loop: {str(e)}")
-                    finally:
-                         # Signal completion regardless of cleanup success/failure
-                         logging.debug("Signalling thread completion.")
-                         thread_done.set()
-
-        thread = threading.Thread(target=thread_func)
-        thread.daemon = True
-        thread.start()
-
-        thread_timeout = timeout + 30
-        if not thread_done.wait(thread_timeout):
-            logging.error(f"Thread execution exceeded timeout ({thread_timeout}s)")
-            exception = TimeoutError(f"Thread execution exceeded timeout ({thread_timeout}s)")
-
-        if exception:
-            logging.error(f"Async operation failed with: {exception}")
-            raise exception
-
-        return result
+    # _run_async method removed, will use imported run_async function
 
     def connect(self, server_name: str, server_params: StdioServerParameters, connect_timeout=30) -> Tuple[bool, Optional[str]]:
         """Connect to a specific MCP server synchronously with timeout. Returns (success, error_message)."""
@@ -187,9 +123,9 @@ class MCPConnectionManager:
                 stdio_context = current_stdio_context
                 return True # Indicate success
 
-            # Run the async connection logic
+            # Run the async connection logic using the imported function
             logging.info(f"[{server_name}] Running connection with {connect_timeout}s timeout")
-            connection_successful = self._run_async(do_connect, timeout=connect_timeout)
+            connection_successful = run_async(do_connect, timeout=connect_timeout) # Use imported function
 
             success = bool(connection_successful)
             logging.info(f"Connection result for {server_name}: {success} with {len(tools)} tools")
@@ -259,7 +195,7 @@ class MCPConnectionManager:
                 return True
 
             logging.info(f"[{server_name}] Running disconnection with {disconnect_timeout}s timeout")
-            success = self._run_async(do_disconnect, timeout=disconnect_timeout)
+            success = run_async(do_disconnect, timeout=disconnect_timeout) # Use imported function
             logging.info(f"[{server_name}] Disconnection result: {success}")
 
         except Exception as e:
@@ -326,7 +262,8 @@ class MCPConnectionManager:
             return await session.call_tool(tool_name, arguments=tool_args)
 
         try:
-            return self._run_async(do_call_tool, timeout=call_timeout)
+            # Use imported function
+            return run_async(do_call_tool, timeout=call_timeout)
         except Exception as e:
             logging.error(f"Error calling MCP tool '{tool_name}' on server '{server_name}': {e}")
             # Potentially update server status to 'error' here

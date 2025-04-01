@@ -25,7 +25,9 @@ from PyQt6.QtGui import QFont
 
 # Import local UI components
 from .dialogs import ApiKeyDialog
-from .widgets import ToolInputWidget, ChatWidget
+from .widgets import ToolInputWidget
+from .chat_widget import ChatWidget
+from .tool_controller import ToolController # Import the new controller
 # Import updated workers for sequential/all operations
 from .workers import MCPSequentialConnectionWorker, MCPDisconnectAllWorker, MCPToolCallWorker, LLMChatWorker
 
@@ -71,7 +73,8 @@ class MCPPyQtClient(QMainWindow):
         # Worker references
         self.connection_worker = None
         self.disconnection_worker = None
-        self.tool_call_worker = None
+        # self.tool_call_worker = None # Worker is now managed by ToolController
+        self.tool_controller = None # Add reference for the controller
         self.initUI()
         # Optionally, trigger auto-connect on startup
         # self.connect_all_servers()
@@ -121,14 +124,11 @@ class MCPPyQtClient(QMainWindow):
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
 
-        # Tools list
+        # Tools list (Widget creation)
         tools_group = QGroupBox("Available Tools")
         tools_layout = QVBoxLayout()
-
-        self.tools_list = QListWidget()
-        self.tools_list.itemClicked.connect(self.on_tool_selected)
-        tools_layout.addWidget(self.tools_list)
-
+        tools_list_widget = QListWidget() # Create instance
+        tools_layout.addWidget(tools_list_widget)
         tools_group.setLayout(tools_layout)
         left_layout.addWidget(tools_group)
 
@@ -136,25 +136,23 @@ class MCPPyQtClient(QMainWindow):
         right_panel = QWidget()
         self.right_layout = QVBoxLayout(right_panel)
 
-        # Tool input area (will be populated when a tool is selected)
-        self.tool_container = QWidget()
-        self.tool_layout = QVBoxLayout(self.tool_container)
-        self.tool_layout.addWidget(QLabel("Select a server and connect, then select a tool."))
+        # Tool input area (Widget creation)
+        tool_container_widget = QWidget()
+        tool_layout = QVBoxLayout(tool_container_widget)
+        tool_layout.addWidget(QLabel("Select a server and connect, then select a tool."))
 
-        # Tool result area
+        # Tool result area (Widget creation)
         result_group = QGroupBox("Tool Results")
         result_layout = QVBoxLayout()
-
-        self.result_text = QTextEdit()
-        self.result_text.setReadOnly(True)
-        result_layout.addWidget(self.result_text)
-
+        result_text_widget = QTextEdit()
+        result_text_widget.setReadOnly(True)
+        result_layout.addWidget(result_text_widget)
         result_group.setLayout(result_layout)
 
         # Add widgets to right panel
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setWidget(self.tool_container)
+        scroll_area.setWidget(tool_container_widget) # Use created widget instance
 
         self.right_layout.addWidget(scroll_area)
         self.right_layout.addWidget(result_group)
@@ -189,6 +187,19 @@ class MCPPyQtClient(QMainWindow):
         self.status_bar.showMessage("Not connected.")
 
         self.setCentralWidget(central_widget)
+
+        # --- Instantiate ToolController ---
+        self.tool_controller = ToolController(
+            connection_mgr=self.connection_mgr,
+            tools_list_widget=tools_list_widget,
+            tool_container_widget=tool_container_widget,
+            tool_layout=tool_layout,
+            result_text_widget=result_text_widget
+        )
+        # Connect the list widget signal to the controller's slot
+        tools_list_widget.itemClicked.connect(self.tool_controller.on_tool_selected)
+        # --- End ToolController Instantiation ---
+
 
         # Update the UI state initially
         self.update_ui_state()
@@ -227,28 +238,15 @@ class MCPPyQtClient(QMainWindow):
                  status_msg += f" ({error_count} errors on last attempt)"
             self.status_bar.showMessage(status_msg)
 
-        # Populate tools list based on current connections
-        self.populate_tools_list()
+        # Delegate tool list population and panel clearing to controller
+        self.tool_controller.populate_tools_list()
 
-        # Clear tool details if no servers are connected
         if not is_any_connected:
-            self.clear_tool_details_panel()
-            self.tool_layout.addWidget(QLabel("Connect to servers to see available tools."))
+            self.tool_controller.clear_tool_details_panel()
+            # Add placeholder label back via controller if needed, or handle in controller
+            self.tool_controller.tool_layout.addWidget(QLabel("Connect to servers to see available tools."))
 
-    def clear_tool_details_panel(self):
-        """Clears the right panel where tool details are shown."""
-        # Clear current tool widget if exists
-        if self.current_tool_widget:
-            self.current_tool_widget.setParent(None)
-            self.current_tool_widget = None
-        # Clear any placeholder labels
-        for i in reversed(range(self.tool_layout.count())):
-            item = self.tool_layout.itemAt(i)
-            if item and item.widget():
-                item.widget().setParent(None)
-        # Clear results text
-        self.result_text.clear()
-
+    # clear_tool_details_panel method removed (now in ToolController)
 
     def connect_all_servers(self):
         """Initiate sequential connection to all configured MCP servers."""
@@ -307,7 +305,7 @@ class MCPPyQtClient(QMainWindow):
         self.status_bar.showMessage("Disconnecting from all servers...")
         self.disconnect_button.setEnabled(False)
         self.connect_button.setEnabled(False)
-        self.clear_tool_details_panel() # Clear tool details on disconnect
+        self.tool_controller.clear_tool_details_panel() # Delegate panel clearing
 
         # Create worker thread for disconnection
         self.disconnection_worker = MCPDisconnectAllWorker(self.connection_mgr)
@@ -322,154 +320,16 @@ class MCPPyQtClient(QMainWindow):
              QMessageBox.warning(self, "Disconnection Issue", "There might have been issues during disconnection, but the client state has been reset.")
         self.update_ui_state() # Update UI to reflect disconnected state
 
-    def populate_tools_list(self):
-        """Populate the tools list, grouping by server."""
-        self.tools_list.clear()
-        all_tools_by_server = self.connection_mgr.get_all_tools() # Gets {server: [tools]}
+    # Methods moved to ToolController:
+    # - populate_tools_list
+    # - on_tool_selected
+    # - execute_tool
+    # - handle_tool_result
+    # - handle_tool_error
 
-        if not all_tools_by_server:
-            self.tools_list.addItem("No tools available. Connect to servers.")
-            return
-
-        # Sort server names for consistent order
-        sorted_server_names = sorted(all_tools_by_server.keys())
-
-        for server_name in sorted_server_names:
-            tools = all_tools_by_server[server_name]
-            if not tools:
-                continue # Skip servers with no tools reported
-
-            # Add a non-selectable header item for the server
-            server_item = QListWidgetItem(f"--- {server_name} ---")
-            server_item.setFlags(server_item.flags() & ~Qt.ItemFlag.ItemIsSelectable) # Make it non-selectable
-            font = server_item.font()
-            font.setBold(True)
-            server_item.setFont(font)
-            self.tools_list.addItem(server_item)
-
-            # Sort tools alphabetically within the server group
-            tools.sort(key=lambda tool: tool.name)
-
-            for tool in tools:
-                item = QListWidgetItem(f"  {tool.name}") # Indent tool names
-                # Store both server and tool name
-                item.setData(Qt.ItemDataRole.UserRole, {"server": server_name, "tool": tool.name})
-                description = getattr(tool, 'description', "No description")
-                item.setToolTip(description if description else "No description")
-                self.tools_list.addItem(item)
-
-    def on_tool_selected(self, item):
-        """Handle tool selection from the list."""
-        tool_data = item.data(Qt.ItemDataRole.UserRole)
-
-        # Ignore clicks on headers or invalid items
-        if not isinstance(tool_data, dict) or "server" not in tool_data or "tool" not in tool_data:
-            logging.debug("Clicked on a non-tool item or item with invalid data.")
-            # Optionally clear the details panel if a header was clicked
-            if not isinstance(tool_data, dict):
-                 self.clear_tool_details_panel()
-                 self.tool_layout.addWidget(QLabel("Select a specific tool from a server."))
-            return
-
-        server_name = tool_data["server"]
-        tool_name = tool_data["tool"]
-
-        # Get the specific tool definition from the manager
-        server_tools = self.connection_mgr.get_tools(server_name)
-        selected_tool = None
-        if server_tools:
-            for tool in server_tools:
-                if tool.name == tool_name:
-                    selected_tool = tool
-                    break
-
-        if not selected_tool:
-            logging.error(f"Selected tool '{tool_name}' from server '{server_name}' not found in manager's list.")
-            self.clear_tool_details_panel()
-            self.tool_layout.addWidget(QLabel(f"Error: Tool '{tool_name}' not found for server '{server_name}'."))
-            return
-
-        # Clear current tool widget and add the new one
-        self.clear_tool_details_panel()
-
-        self.current_tool_widget = ToolInputWidget(selected_tool, server_name) # Pass server_name for context if needed
-        # Connect execute button, passing both server and tool name
-        self.current_tool_widget.execute_button.clicked.connect(
-            lambda checked=False, sn=server_name, tn=tool_name: self.execute_tool(sn, tn)
-        )
-        self.tool_layout.addWidget(self.current_tool_widget)
-        self.result_text.clear() # Clear previous results
-
-    def execute_tool(self, server_name, tool_name):
-        """Execute the selected tool on the specified server."""
-        if not self.current_tool_widget or \
-           self.current_tool_widget.tool.name != tool_name or \
-           self.current_tool_widget.server_name != server_name:
-            logging.warning(f"Tool widget mismatch or not found for {tool_name} on {server_name}")
-            QMessageBox.warning(self, "Execution Error", "Tool selection mismatch. Please re-select the tool.")
-            return
-
-        # Check if the specific server is actually connected
-        if not self.connection_mgr.is_connected(server_name):
-             QMessageBox.critical(self, "Execution Error", f"Server '{server_name}' is not currently connected.")
-             return
-
-        args = self.current_tool_widget.get_arguments()
-        if args is None:  # Invalid JSON input by user
-            return
-
-        self.result_text.clear()
-        self.result_text.append(f"Executing tool: {tool_name} on server: {server_name}")
-        self.result_text.append(f"Arguments: {json.dumps(args, indent=2)}")
-        self.result_text.append("\nWaiting for results...")
-
-        # Disable execute button while running? (Optional)
-        # self.current_tool_widget.execute_button.setEnabled(False)
-
-        # Create and start the worker thread for the specific tool call
-        self.tool_call_worker = MCPToolCallWorker(self.connection_mgr, server_name, tool_name, args)
-        self.tool_call_worker.result_ready.connect(self.handle_tool_result)
-        self.tool_call_worker.error_occurred.connect(self.handle_tool_error)
-        self.tool_call_worker.start()
-
-    def handle_tool_result(self, result):
-        """Handle the result from a tool execution."""
-        # Re-enable execute button if it was disabled
-        # if self.current_tool_widget: self.current_tool_widget.execute_button.setEnabled(True)
-        self.result_text.clear()
-
-        if result is None:
-            self.result_text.append("No result returned from tool.")
-            return
-
-        try:
-            # Attempt to pretty-print if it's likely JSON, otherwise just stringify
-            result_content = getattr(result, 'content', result) # Get content if available
-            if isinstance(result_content, (dict, list)):
-                result_str = json.dumps(result_content, indent=2)
-            # Handle cases where content might be a list of simple types or complex objects
-            elif isinstance(result_content, list) and result_content and not isinstance(result_content[0], (dict, list)):
-                 result_str = "\n".join(map(str, result_content))
-            else:
-                result_str = str(result_content)
-
-            self.result_text.append("Tool execution successful:\n")
-            self.result_text.append(result_str)
-        except Exception as e:
-            logging.error(f"Error formatting tool result: {e}")
-            self.result_text.append(f"Tool execution successful, but result formatting failed:\n{str(result)}")
-
-        # Scroll to top
-        self.result_text.verticalScrollBar().setValue(0) # Scroll to top
-
-    def handle_tool_error(self, error_msg):
-        """Handle an error during tool execution."""
-        # Re-enable execute button if it was disabled
-        # if self.current_tool_widget: self.current_tool_widget.execute_button.setEnabled(True)
-        self.result_text.clear()
-        self.result_text.append("Tool execution failed:\n")
-        self.result_text.append(error_msg)
-        # Optionally update server status to error?
+    # Need to keep reference to the widgets passed to controller if needed elsewhere,
+    # but the methods operating on them are now in the controller.
+    # We delegate calls in update_ui_state and connect_all_servers/disconnect_all_servers.
 
     def closeEvent(self, event):
         """Ensure disconnection from all servers when closing the window."""

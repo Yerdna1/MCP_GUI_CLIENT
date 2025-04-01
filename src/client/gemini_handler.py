@@ -22,10 +22,21 @@ safety_settings = {
     HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
 }
 
-def format_tools_for_gemini(connection_mgr):
-    """Formats MCP tools for the Gemini API's function calling format."""
-    gemini_tools = []
-    all_mcp_tools = connection_mgr.get_all_tools() # {server: [tools]}
+# Import formatting functions from utils
+try:
+    from .gemini_utils import format_tools_for_gemini
+    from .history_utils import format_history_for_gemini
+except ImportError:
+    logging.error("Failed to import Gemini utility functions.")
+    # Define dummy functions if import fails
+    def format_tools_for_gemini(*args, **kwargs): return None
+    def format_history_for_gemini(*args, **kwargs): return []
+
+# format_tools_for_gemini function removed (moved to gemini_utils.py)
+
+# format_history_for_gemini function removed (moved to history_utils.py)
+
+def get_gemini_response(connection_mgr, gemini_model_name, user_input):
 
     if not all_mcp_tools:
         return None
