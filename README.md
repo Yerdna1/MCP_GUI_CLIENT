@@ -1,103 +1,113 @@
-# MCP Client Example ☀️ 
+# MCP PyQt Klient (Slovenská verzia)
 
-This project demonstrates a simple client-server implementation using the Model Context Protocol (MCP), which is a standardized way to connect large language models with tools and data.
+Grafický klient pre interakciu s MCP (Model Context Protocol) servermi pomocou PyQt6. Umožňuje pripojenie k viacerým serverom sekvenčne a interakciu s LLM modelmi (Ollama, Anthropic, Gemini) s podporou nástrojov (tools/function calling).
 
-## Overview
+## Funkcie
 
-This example shows how to:
-- Create an MCP server with custom tools
-- Connect to the server using an MCP client
-- Call tools and get responses from the server
+*   **Sekvenčné pripojenie:** Automaticky sa pokúsi pripojiť ku všetkým povoleným MCP serverom definovaným v `mcp_config.json`.
+*   **Podpora viacerých LLM:** Umožňuje výber medzi Ollama, Anthropic (Claude) a Google Gemini modelmi.
+*   **Podpora nástrojov (Tool Use / Function Calling):** LLM modely môžu využívať nástroje poskytované pripojenými MCP servermi.
+*   **Grafické rozhranie:** Prehľadné rozhranie postavené na PyQt6.
+    *   Záložka pre manuálny výber a volanie nástrojov.
+    *   Záložka pre chat s LLM.
+    *   Konfigurácia API kľúčov pre Anthropic a Gemini.
+    *   Stavový riadok zobrazujúci stav pripojenia.
+    *   Príklady promptov pre jednoduchšie testovanie.
 
-## Tutorial Video
+## Požiadavky
 
-[![MCP Tutorial Video](https://img.youtube.com/vi/oq3dkNm51qc/0.jpg)](https://youtu.be/oq3dkNm51qc)
+*   Python 3.10+
+*   Docker (pre spustenie MCP serverov ako kontajnerov)
+*   Git (pre klonovanie repozitára)
+*   Požadované Python knižnice (viď `requreiments.txt`)
 
-Click the image above to watch a tutorial on MCP implementation.
+## Inštalácia a Nastavenie
 
-## Project Structure
+1.  **Klonovanie Repozitára:**
+    ```bash
+    git clone https://github.com/Yerdna1/MCP_GUI_CLIENT.git
+    cd MCP_GUI_CLIENT
+    ```
 
-```
-.
-├── pyproject.toml
-├── README.md
-├── src
-│   ├── client
-│   │   └── mcp_client.py      # MCP client implementation
-│   └── server
-│       └── example_server.py  # MCP server with tools
-└── uv.lock
-```
+2.  **Vytvorenie Virtuálneho Prostredia:**
+    ```bash
+    python -m venv .venv
+    ```
 
-## Server Implementation
+3.  **Aktivácia Virtuálneho Prostredia:**
+    *   Windows (Command Prompt/PowerShell):
+        ```powershell
+        .\.venv\Scripts\Activate.ps1
+        # alebo
+        .\.venv\Scripts\activate.bat
+        ```
+    *   macOS/Linux:
+        ```bash
+        source .venv/bin/activate
+        ```
 
-The server exposes two tools:
-1. `calculate_bmi` - A simple calculator that computes Body Mass Index
-2. `fetch_weather` - An async tool that retrieves weather data from an external API
+4.  **Inštalácia Závislostí:**
+    ```bash
+    pip install -r requreiments.txt
+    ```
+    *(Poznámka: Názov súboru `requreiments.txt` obsahuje preklep.)*
 
-## Client Implementation
+5.  **Konfigurácia MCP Serverov (`mcp_config.json`):**
+    *   Upravte súbor `mcp_config.json` podľa vašich potrieb.
+    *   Definujte príkazy a argumenty pre spustenie vašich MCP serverov (napr. cez Docker).
+    *   Uistite sa, že cesty k bind mountom v Docker príkazoch sú správne pre váš systém.
+    *   **Dôležité:** Ak používate `github` server, nastavte `GITHUB_PERSONAL_ACCESS_TOKEN` ako systémovú environmentálnu premennú. Token bol odstránený z `mcp_config.json` z bezpečnostných dôvodov.
 
-The client connects to the server via stdio, initializes a session, and calls the server's tools.
+6.  **Konfigurácia API Kľúčov (v aplikácii):**
+    *   Spustite aplikáciu.
+    *   Prejdite na záložku "Chat with LLM".
+    *   Kliknite na tlačidlo "Configure API Keys".
+    *   Zadajte vaše API kľúče pre Anthropic a/alebo Google Gemini.
+    *   Zaškrtnite "Save API key", ak si želáte kľúč uložiť pre budúce použitie (ukladá sa lokálne pomocou QSettings).
 
-## Getting Started
+## Spustenie Aplikácie
 
-### Prerequisites
-
-- Python 3.9+
-- uv (Python package manager)
-
-### Installation
+Po aktivácii virtuálneho prostredia a konfigurácii spustite hlavný skript:
 
 ```bash
-# Install dependencies
-uv install -e .
+python improved_mcp_client.py
 ```
+*(Poznámka: Predpokladá sa, že `improved_mcp_client.py` je hlavný spúšťací skript.)*
 
-### Running the Example
+## Používanie
 
-1. Start the client (which will automatically start the server):
+1.  **Pripojenie k Serverom:** Kliknite na tlačidlo "Connect All". Aplikácia sa pokúsi sekvenčne pripojiť ku všetkým povoleným serverom v `mcp_config.json`. Stav pripojenia sa zobrazí v stavovom riadku.
+2.  **Manuálne Volanie Nástrojov:**
+    *   Prejdite na záložku "Manual Tool Selection".
+    *   Po úspešnom pripojení sa v ľavom paneli zobrazí zoznam dostupných nástrojov zoskupených podľa servera.
+    *   Kliknite na nástroj pre zobrazenie jeho detailov a vstupného poľa pre argumenty.
+    *   Zadajte argumenty v JSON formáte.
+    *   Kliknite na "Execute Tool". Výsledok sa zobrazí v poli "Tool Results".
+3.  **Chat s LLM:**
+    *   Prejdite na záložku "Chat with LLM".
+    *   Vyberte typ LLM (Ollama, Anthropic, Gemini) a konkrétny model z dropdown menu.
+    *   Ak používate Anthropic alebo Gemini, uistite sa, že ste nakonfigurovali API kľúč.
+    *   Použite príklady promptov alebo zadajte vlastnú správu do vstupného poľa.
+    *   Kliknite na "Send" alebo stlačte Enter.
+    *   LLM môže odpovedať priamo alebo požiadať o použitie nástroja. Ak použije nástroj, výsledok nástroja sa pošle späť LLM pre finálnu odpoveď.
 
-```bash
-uv run src/client/mcp_client.py
-```
+## Štruktúra Projektu (Prehľad)
 
-## Usage
+*   `.venv/`: Virtuálne prostredie Pythonu.
+*   `src/`: Hlavný zdrojový kód.
+    *   `client/`: Kód špecifický pre klienta (LLM handlery, konfigurácia, stav konverzácie).
+    *   `server/`: Príklady MCP serverov (ak sú zahrnuté).
+    *   `mcp_connector_fixed.py`: Hlavná logika pre správu MCP pripojení.
+*   `ui/`: Kód pre grafické rozhranie (hlavné okno, widgety, dialógy, workery).
+*   `mcp_config.json`: Konfigurácia MCP serverov.
+*   `requreiments.txt`: Zoznam Python závislostí.
+*   `improved_mcp_client.py`: Predpokladaný hlavný spúšťací skript.
+*   `.gitignore`: Súbory a adresáre ignorované Gitom.
+*   `README.md`: Tento súbor.
 
-The client will:
-1. Connect to the server
-2. List available tools
-3. Call the BMI calculator with sample data
-4. Call the weather tool with sample coordinates
+## Riešenie Problémov
 
-## Example Response
-
-```
-Available tools: meta=None nextCursor=None tools=[...]
-BMI calculation result: 22.857142857142858
-Weather data: {"current_weather":{"temperature":14.2,"windspeed":12.6, ...}}
-```
-## Test with MCP Inspector 
-( run command below and then visit http://localhost:5173 )
-
-```
-  ❯ mcp dev src/server/example_server.py
-Starting MCP inspector...
-Proxy server listening on port 3000
-
-🔍 MCP Inspector is up and running at http://localhost:5173 🚀
-New SSE connection
-Query parameters: {
-  transportType: 'stdio',
-  command: 'uv',
-  args: 'run --with mcp mcp run src/server/example_server.py',
-```
-
-## Resources
-
-This project uses:
-- [Model Context Protocol Python SDK](https://github.com/modelcontextprotocol/python-sdk)
-- [MCP Official Documentation](https://modelcontextprotocol.io)
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+*   **Chyby pripojenia:** Skontrolujte príkazy a cesty v `mcp_config.json`. Uistite sa, že Docker beží a obrazy pre MCP servery sú stiahnuté. Skontrolujte logy aplikácie pre detailnejšie informácie.
+*   **Chyby API kľúčov:** Uistite sa, že ste správne zadali a uložili API kľúče cez dialóg "Configure API Keys". Pre GitHub server overte nastavenie environmentálnej premennej `GITHUB_PERSONAL_ACCESS_TOKEN`.
+*   **Chyby LLM:** Skontrolujte logy pre chyby pri komunikácii s LLM API. Uistite sa, že vybraný model je dostupný a správne nakonfigurovaný (napr. Ollama musí bežať lokálne, ak používate lokálne modely).
+*   **Chýbajúca knižnica `google.generativeai`:** Ak sa "gemini" nezobrazuje v dropdown menu aj po reštarte, skúste znova nainštalovať knižnicu priamo do virtuálneho prostredia: `.\.venv\Scripts\pip.exe install google-generativeai` (Windows) alebo `source .venv/bin/activate && pip install google-generativeai` (macOS/Linux).
