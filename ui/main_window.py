@@ -257,8 +257,8 @@ class MCPPyQtClient(QMainWindow):
         self.status_bar.showMessage("Initiating connections...")
         self.connect_button.setEnabled(False)
         self.disconnect_button.setEnabled(False)
-        self.clear_tool_details_panel() # Clear old tool details
-        self.tools_list.clear() # Clear old tools list
+        self.tool_controller.clear_tool_details_panel() # Delegate panel clearing
+        self.tool_controller.tools_list.clear() # Clear list via controller's reference
 
         # Create and start the sequential connection worker
         self.connection_worker = MCPSequentialConnectionWorker(self.connection_mgr, self.mcp_config)
